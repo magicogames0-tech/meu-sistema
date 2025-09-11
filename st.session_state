@@ -1,0 +1,28 @@
+import streamlit as st
+import hashlib
+
+# Inicializa usuários
+if "users" not in st.session_state:
+    st.session_state.users = [
+        {
+            "username": "bk",
+            "password_hash": hashlib.sha256("64920169".encode()).hexdigest()
+        }
+    ]
+
+def verify_login(username, password):
+    phash = hashlib.sha256(password.encode()).hexdigest()
+    for u in st.session_state.users:
+        if u["username"] == username and u["password_hash"] == phash:
+            return True
+    return False
+
+# Tela de login
+username = st.text_input("Usuário")
+password = st.text_input("Senha", type="password")
+
+if st.button("Entrar"):
+    if verify_login(username, password):
+        st.success(f"Bem-vindo, {username}!")
+    else:
+        st.error("Usuário ou senha incorretos.")
