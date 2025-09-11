@@ -101,7 +101,7 @@ def app_screen():
             st.info("Item removido.")
 
     # -------- Cupom --------
-    st.subheader("🧾 Cupom")
+    st.code(cupom_texto, language="text")
     if st.button("Gerar Cupom"):
         if not cliente or not endereco:
             st.error("⚠️ Preencha nome e endereço.")
