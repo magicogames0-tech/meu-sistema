@@ -1,10 +1,8 @@
-USERS_FILE = "users.json"
-
-default_user = {
-    "users": [
-        {
-            "username": "bk",
-            "password_hash": hashlib.sha256("64920169".encode()).hexdigest()
-        }
-    ]
+{
+  "users": [
+    {
+      "username": "bk",
+      "password_hash": "81e74e5f3c032f6e1d84e15741c23a0fba7c99c34a93ae1f02dcd8f1adf6dc0a"
+    }
+  ]
 }
