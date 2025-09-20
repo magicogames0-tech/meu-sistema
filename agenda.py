@@ -1,10 +1,24 @@
+import sqlite3
 from flask import Flask, render_template_string, request, redirect, url_for
-from datetime import datetime
 
 app = Flask(__name__)
 
-# Banco de dados simples em memória (lista)
-agendamentos = []
+# Criar tabela se não existir
+def init_db():
+    conn = sqlite3.connect("agenda.db")
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS agendamentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            data TEXT NOT NULL,
+            hora TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
 
 # HTML básico
 template = """
@@ -37,9 +51,9 @@ template = """
         <tr><th>Nome</th><th>Data</th><th>Hora</th></tr>
         {% for ag in agendamentos %}
         <tr>
-            <td>{{ ag['nome'] }}</td>
-            <td>{{ ag['data'] }}</td>
-            <td>{{ ag['hora'] }}</td>
+            <td>{{ ag[0] }}</td>
+            <td>{{ ag[1] }}</td>
+            <td>{{ ag[2] }}</td>
         </tr>
         {% endfor %}
     </table>
@@ -50,15 +64,23 @@ template = """
 
 @app.route("/", methods=["GET", "POST"])
 def home():
+    conn = sqlite3.connect("agenda.db")
+    c = conn.cursor()
+
     if request.method == "POST":
         nome = request.form["nome"]
         data = request.form["data"]
         hora = request.form["hora"]
 
-        # salvar agendamento
-        agendamentos.append({"nome": nome, "data": data, "hora": hora})
+        c.execute("INSERT INTO agendamentos (nome, data, hora) VALUES (?, ?, ?)", (nome, data, hora))
+        conn.commit()
 
         return redirect(url_for("home"))
+
+    c.execute("SELECT nome, data, hora FROM agendamentos ORDER BY id DESC")
+    agendamentos = c.fetchall()
+    conn.close()
+
     return render_template_string(template, agendamentos=agendamentos)
 
 if __name__ == "__main__":
