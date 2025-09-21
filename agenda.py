@@ -6,9 +6,9 @@ from psycopg2.extras import RealDictCursor
 app = Flask(__name__)
 
 # =====================================================
-# Configurar banco de dados PostgreSQL
+# Configuração do Banco
 # =====================================================
-DATABASE_URL = os.environ.get("postgresql://agenda_bfpj_user:nnaFn93ToyugzE42iziNrOjs5SKsuURE@dpg-d37m63umcj7s73fo851g-a/agenda_bfpj")
+DATABASE_URL = os.environ.get("postgresql://agenda_bfpj_user:nnaFn93ToyugzE42iziNrOjs5SKsuURE@dpg-d37m63umcj7s73fo851g-a/agenda_bfpj")  # Pega do environment do Render
 
 def get_conn():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
@@ -74,10 +74,9 @@ def clientes():
         telefone = request.form["telefone"]
         c.execute("INSERT INTO clientes (nome, telefone) VALUES (%s, %s)", (nome, telefone))
         conn.commit()
-        conn.close()
         return redirect(url_for("clientes"))
 
-    c.execute("SELECT * FROM clientes")
+    c.execute("SELECT * FROM clientes ORDER BY id DESC")
     clientes = c.fetchall()
     conn.close()
 
@@ -95,10 +94,11 @@ def agendamentos():
         cliente_id = request.form["cliente_id"]
         data = request.form["data"]
         hora = request.form["hora"]
-        c.execute("INSERT INTO agendamentos (cliente_id, data, hora) VALUES (%s, %s, %s)",
-                  (cliente_id, data, hora))
+        c.execute(
+            "INSERT INTO agendamentos (cliente_id, data, hora) VALUES (%s, %s, %s)",
+            (cliente_id, data, hora)
+        )
         conn.commit()
-        conn.close()
         return redirect(url_for("agendamentos"))
 
     # Listar agendamentos ativos
@@ -107,11 +107,12 @@ def agendamentos():
     FROM agendamentos ag
     JOIN clientes cl ON ag.cliente_id = cl.id
     WHERE ag.status = 'ativo'
+    ORDER BY ag.id DESC
     """)
     agendamentos = c.fetchall()
 
-    # Listar todos os clientes
-    c.execute("SELECT * FROM clientes")
+    # Listar todos os clientes (para fallback ou debug)
+    c.execute("SELECT * FROM clientes ORDER BY id DESC")
     clientes = c.fetchall()
     conn.close()
 
@@ -150,6 +151,7 @@ def finalizados():
     FROM agendamentos ag
     JOIN clientes cl ON ag.cliente_id = cl.id
     WHERE ag.status = 'finalizado'
+    ORDER BY ag.id DESC
     """)
     finalizados = c.fetchall()
     conn.close()
@@ -165,6 +167,7 @@ def desmarcados():
     FROM agendamentos ag
     JOIN clientes cl ON ag.cliente_id = cl.id
     WHERE ag.status = 'desmarcado'
+    ORDER BY ag.id DESC
     """)
     desmarcados = c.fetchall()
     conn.close()
@@ -184,6 +187,3 @@ def home():
 if __name__ == "__main__":
     init_db()
     app.run(host="0.0.0.0", port=5000)
-else:
-    with app.app_context():
-        init_db()
