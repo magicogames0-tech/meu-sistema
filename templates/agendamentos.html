@@ -1,80 +1,49 @@
-{% extends "base.html" %}
+<form method="POST">
+    <label for="cliente">Cliente:</label>
+    <input type="text" id="cliente" placeholder="Digite o nome do cliente" autocomplete="off">
+    <input type="hidden" name="cliente_id" id="cliente_id">
+    <ul id="lista-clientes" class="list-group mt-1"></ul>
 
-{% block content %}
-<div class="container mt-4">
-    <div class="card shadow-sm p-4">
-        <h2 class="text-center mb-4">
-            📅 Agendamentos
-        </h2>
+    <label for="data">Data:</label>
+    <input type="date" name="data" required>
 
-        <!-- Formulário -->
-        <form method="POST" action="{{ url_for('agendamentos') }}">
-            <div class="mb-3">
-                <label for="cliente" class="form-label">Cliente:</label>
-                <select name="cliente" id="cliente" class="form-control" required>
-                    {% for cliente in clientes %}
-                        <option value="{{ cliente.nome }}">{{ cliente.nome }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+    <label for="hora">Hora:</label>
+    <input type="time" name="hora" required>
 
-            <div class="mb-3">
-                <label for="data" class="form-label">Data:</label>
-                <input type="date" name="data" id="data" class="form-control" required>
-            </div>
+    <button type="submit">Agendar</button>
+</form>
 
-            <div class="mb-3">
-                <label for="hora" class="form-label">Hora:</label>
-                <input type="time" name="hora" id="hora" class="form-control" required>
-            </div>
-
-            <button type="submit" class="btn btn-success">Agendar</button>
-        </form>
-
-        <!-- Lista de Agendamentos -->
-        <h4 class="mt-4">📋 Lista de Agendamentos</h4>
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Cliente</th>
-                    <th>Data</th>
-                    <th>Hora</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for ag in agendamentos %}
-                <tr>
-                    <td>{{ ag.id }}</td>
-                    <td>{{ ag.cliente }}</td>
-                    <td>{{ ag.data }}</td>
-                    <td>{{ ag.hora }}</td>
-                    <td>
-                        <a href="{{ url_for('finalizar_agendamento', id=ag.id) }}" class="btn btn-sm btn-success">Finalizar</a>
-                        <a href="{{ url_for('desmarcar_agendamento', id=ag.id) }}" class="btn btn-sm btn-danger">Desmarcar</a>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="5" class="text-center">Nenhum agendamento encontrado.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Select2: transformar select em campo de pesquisa -->
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-    $(document).ready(function() {
-        $('#cliente').select2({
-            placeholder: "Digite o nome do cliente",
-            allowClear: true
+const input = document.getElementById('cliente');
+const hiddenId = document.getElementById('cliente_id');
+const lista = document.getElementById('lista-clientes');
+
+input.addEventListener('input', async () => {
+    const query = input.value.trim();
+    if(query.length < 2){
+        lista.innerHTML = '';
+        hiddenId.value = '';
+        return;
+    }
+
+    try {
+        const res = await fetch(`/buscar_clientes?q=${encodeURIComponent(query)}`);
+        const clientes = await res.json();
+
+        lista.innerHTML = clientes.length > 0
+            ? clientes.map(c => `<li class="list-group-item" data-id="${c.id}">${c.nome}</li>`).join('')
+            : '<li class="list-group-item">Nenhum cliente encontrado</li>';
+
+        lista.querySelectorAll('li[data-id]').forEach(li => {
+            li.addEventListener('click', () => {
+                input.value = li.textContent;
+                hiddenId.value = li.getAttribute('data-id');
+                lista.innerHTML = '';
+            });
         });
-    });
+
+    } catch(err) {
+        console.error(err);
+    }
+});
 </script>
-{% endblock %}
