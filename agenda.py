@@ -44,21 +44,21 @@ def init_db():
     conn.close()
 
 # =====================================================
-# Autocomplete de clientes
+# Rota de busca de clientes para autocomplete
 # =====================================================
 @app.route("/buscar_clientes")
 def buscar_clientes():
-    q = request.args.get("q", "").strip()
-    if not q:
+    query = request.args.get("q", "").strip()
+    if not query:
         return jsonify([])
 
     conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT id, nome FROM clientes WHERE nome ILIKE %s", ('%' + q + '%',))
+    c.execute("SELECT id, nome FROM clientes WHERE nome ILIKE %s", ('%' + query + '%',))
     clientes = c.fetchall()
     conn.close()
 
-    resultado = [{"id": c["id"], "nome": c["nome"]} for c in clientes]
+    resultado = [{"id": cliente["id"], "nome": cliente["nome"]} for cliente in clientes]
     return jsonify(resultado)
 
 # =====================================================
@@ -71,19 +71,38 @@ def clientes_view():
 
     if request.method == "POST":
         nome = request.form["nome"]
-        telefone = request.form.get("telefone", "")
+        telefone = request.form["telefone"]
         c.execute("INSERT INTO clientes (nome, telefone) VALUES (%s, %s)", (nome, telefone))
         conn.commit()
-        conn.close()
         return redirect(url_for("clientes_view"))
 
     c.execute("SELECT * FROM clientes ORDER BY id DESC")
     clientes = c.fetchall()
     conn.close()
+
     return render_template("clientes.html", clientes=clientes)
 
+@app.route("/clientes/editar/<int:cliente_id>", methods=["GET", "POST"])
+def editar_cliente_view(cliente_id):
+    conn = get_conn()
+    c = conn.cursor()
+
+    if request.method == "POST":
+        nome = request.form["nome"]
+        telefone = request.form["telefone"]
+        c.execute("UPDATE clientes SET nome=%s, telefone=%s WHERE id=%s", (nome, telefone, cliente_id))
+        conn.commit()
+        conn.close()
+        return redirect(url_for("clientes_view"))
+
+    c.execute("SELECT * FROM clientes WHERE id=%s", (cliente_id,))
+    cliente = c.fetchone()
+    conn.close()
+
+    return render_template("editar_cliente.html", cliente=cliente)
+
 @app.route("/clientes/excluir/<int:cliente_id>")
-def excluir_cliente(cliente_id):
+def excluir_cliente_view(cliente_id):
     conn = get_conn()
     c = conn.cursor()
     c.execute("DELETE FROM agendamentos WHERE cliente_id=%s", (cliente_id,))
@@ -101,22 +120,16 @@ def agendamentos_view():
     c = conn.cursor()
 
     if request.method == "POST":
-        cliente_id = request.form.get("cliente_id")
-        data = request.form.get("data")
-        hora = request.form.get("hora")
-
-        if not cliente_id:
-            return "Erro: selecione um cliente válido.", 400
-
+        cliente_id = request.form["cliente_id"]
+        data = request.form["data"]
+        hora = request.form["hora"]
         c.execute(
             "INSERT INTO agendamentos (cliente_id, data, hora) VALUES (%s, %s, %s)",
             (cliente_id, data, hora)
         )
         conn.commit()
-        conn.close()
         return redirect(url_for("agendamentos_view"))
 
-    # Lista de agendamentos com nomes dos clientes
     c.execute("""
     SELECT ag.id, cl.nome, ag.data, ag.hora, ag.status
     FROM agendamentos ag
@@ -125,11 +138,40 @@ def agendamentos_view():
     """)
     agendamentos = c.fetchall()
 
+    c.execute("SELECT * FROM clientes ORDER BY id DESC")
+    clientes = c.fetchall()
     conn.close()
-    return render_template("agendamentos.html", agendamentos=agendamentos)
+
+    return render_template("agendamentos.html", agendamentos=agendamentos, clientes=clientes)
+
+@app.route("/agendamentos/editar/<int:agendamento_id>", methods=["GET", "POST"])
+def editar_agendamento_view(agendamento_id):
+    conn = get_conn()
+    c = conn.cursor()
+
+    if request.method == "POST":
+        cliente_id = request.form["cliente_id"]
+        data = request.form["data"]
+        hora = request.form["hora"]
+        status = request.form.get("status", "ativo")
+        c.execute(
+            "UPDATE agendamentos SET cliente_id=%s, data=%s, hora=%s, status=%s WHERE id=%s",
+            (cliente_id, data, hora, status, agendamento_id)
+        )
+        conn.commit()
+        conn.close()
+        return redirect(url_for("agendamentos_view"))
+
+    c.execute("SELECT * FROM agendamentos WHERE id=%s", (agendamento_id,))
+    agendamento = c.fetchone()
+    c.execute("SELECT * FROM clientes ORDER BY id DESC")
+    clientes = c.fetchall()
+    conn.close()
+
+    return render_template("editar_agendamento.html", agendamento=agendamento, clientes=clientes)
 
 @app.route("/agendamentos/excluir/<int:agendamento_id>")
-def excluir_agendamento(agendamento_id):
+def excluir_agendamento_view(agendamento_id):
     conn = get_conn()
     c = conn.cursor()
     c.execute("DELETE FROM agendamentos WHERE id=%s", (agendamento_id,))
@@ -137,8 +179,11 @@ def excluir_agendamento(agendamento_id):
     conn.close()
     return redirect(url_for("agendamentos_view"))
 
+# =====================================================
+# Alterar status do agendamento
+# =====================================================
 @app.route("/finalizar/<int:agendamento_id>")
-def finalizar(agendamento_id):
+def finalizar_view(agendamento_id):
     conn = get_conn()
     c = conn.cursor()
     c.execute("UPDATE agendamentos SET status='finalizado' WHERE id=%s", (agendamento_id,))
@@ -147,7 +192,7 @@ def finalizar(agendamento_id):
     return redirect(url_for("agendamentos_view"))
 
 @app.route("/desmarcar/<int:agendamento_id>")
-def desmarcar(agendamento_id):
+def desmarcar_view(agendamento_id):
     conn = get_conn()
     c = conn.cursor()
     c.execute("UPDATE agendamentos SET status='desmarcado' WHERE id=%s", (agendamento_id,))
@@ -156,10 +201,43 @@ def desmarcar(agendamento_id):
     return redirect(url_for("agendamentos_view"))
 
 # =====================================================
+# Listas de Finalizados e Desmarcados
+# =====================================================
+@app.route("/finalizados")
+def finalizados_view():
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("""
+    SELECT ag.id, cl.nome, ag.data, ag.hora 
+    FROM agendamentos ag
+    JOIN clientes cl ON ag.cliente_id = cl.id
+    WHERE ag.status = 'finalizado'
+    ORDER BY ag.id DESC
+    """)
+    finalizados = c.fetchall()
+    conn.close()
+    return render_template("finalizados.html", finalizados=finalizados)
+
+@app.route("/desmarcados")
+def desmarcados_view():
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("""
+    SELECT ag.id, cl.nome, ag.data, ag.hora 
+    FROM agendamentos ag
+    JOIN clientes cl ON ag.cliente_id = cl.id
+    WHERE ag.status = 'desmarcado'
+    ORDER BY ag.id DESC
+    """)
+    desmarcados = c.fetchall()
+    conn.close()
+    return render_template("desmarcados.html", desmarcados=desmarcados)
+
+# =====================================================
 # Home
 # =====================================================
 @app.route("/")
-def home():
+def home_view():
     return redirect(url_for("agendamentos_view"))
 
 # =====================================================
@@ -167,4 +245,4 @@ def home():
 # =====================================================
 if __name__ == "__main__":
     init_db()
-    # app.run()  # Não é necessário no Render
+    # app.run()  # não é necessário no Render
