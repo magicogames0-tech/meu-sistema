@@ -44,11 +44,6 @@ def init_db():
     conn.close()
 
 # =====================================================
-# Executa a inicialização das tabelas sempre que o app inicia
-# =====================================================
-init_db()
-
-# =====================================================
 # Rota de busca de clientes para autocomplete
 # =====================================================
 @app.route("/buscar_clientes")
@@ -63,7 +58,8 @@ def buscar_clientes():
     clientes = c.fetchall()
     conn.close()
 
-    resultado = [{"id": cid, "nome": nome} for cid, nome in clientes]
+    # Corrigido para pegar os valores do RealDictCursor
+    resultado = [{"id": cliente["id"], "nome": cliente["nome"]} for cliente in clientes]
     return jsonify(resultado)
 
 # =====================================================
@@ -116,7 +112,7 @@ def agendamentos():
     """)
     agendamentos = c.fetchall()
 
-    # Listar todos os clientes (para fallback ou debug)
+    # Listar todos os clientes
     c.execute("SELECT * FROM clientes ORDER BY id DESC")
     clientes = c.fetchall()
     conn.close()
@@ -185,3 +181,10 @@ def desmarcados():
 @app.route("/")
 def home():
     return redirect(url_for("agendamentos"))
+
+# =====================================================
+# Inicialização
+# =====================================================
+if __name__ == "__main__":
+    init_db()
+    # No Render não precisa de app.run(); o Gunicorn cuidará disso
