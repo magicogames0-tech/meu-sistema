@@ -8,7 +8,7 @@
     <form method="POST">
         <div class="mb-3">
             <label for="cliente">Cliente:</label>
-            <input type="text" id="cliente" placeholder="Digite o nome do cliente" autocomplete="off" class="form-control">
+            <input type="text" id="cliente" placeholder="Digite o nome do cliente" autocomplete="off" class="form-control" required>
             <input type="hidden" name="cliente_id" id="cliente_id">
             <ul id="lista-clientes" class="list-group mt-1"></ul>
         </div>
@@ -42,13 +42,15 @@
         <tbody>
             {% for ag in agendamentos %}
             <tr>
-                <td>{{ ag.cliente_nome }}</td>
-                <td>{{ ag.data }}</td>
-                <td>{{ ag.hora }}</td>
-                <td>{{ ag.status }}</td>
+                <td>{{ ag[1] }}</td>
+                <td>{{ ag[2] }}</td>
+                <td>{{ ag[3] }}</td>
+                <td>{{ ag[4] }}</td>
                 <td>
-                    <a href="{{ url_for('finalizar', agendamento_id=ag.id) }}" class="btn btn-success btn-sm">Finalizar</a>
-                    <a href="{{ url_for('desmarcar', agendamento_id=ag.id) }}" class="btn btn-danger btn-sm">Desmarcar</a>
+                    {% if ag[4] != "Finalizado" %}
+                        <a href="{{ url_for('finalizar', agendamento_id=ag[0]) }}" class="btn btn-success btn-sm">Finalizar</a>
+                    {% endif %}
+                    <a href="{{ url_for('desmarcar', agendamento_id=ag[0]) }}" class="btn btn-danger btn-sm">Desmarcar</a>
                 </td>
             </tr>
             {% endfor %}
@@ -63,7 +65,7 @@ const lista = document.getElementById('lista-clientes');
 
 input.addEventListener('input', async () => {
     const query = input.value.trim();
-    if(query.length < 2){
+    if(query.length < 1){
         lista.innerHTML = '';
         hiddenId.value = '';
         return;
