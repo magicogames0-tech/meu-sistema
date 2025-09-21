@@ -1,19 +1,29 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify
-import sqlite3
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
+
+# =====================================================
+# Conexão com o PostgreSQL
+# =====================================================
+DATABASE_URL = os.environ.get("postgresql://agenda_bfpj_user:nnaFn93ToyugzE42iziNrOjs5SKsuURE@dpg-d37m63umcj7s73fo851g-a/agenda_bfpj")  # pega do Render
+
+def get_conn():
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 # =====================================================
 # Inicializar banco de dados
 # =====================================================
 def init_db():
-    conn = sqlite3.connect("agenda.db")
+    conn = get_conn()
     c = conn.cursor()
 
     # Tabela de clientes
     c.execute("""
     CREATE TABLE IF NOT EXISTS clientes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         nome TEXT NOT NULL,
         telefone TEXT
     )
@@ -22,12 +32,11 @@ def init_db():
     # Tabela de agendamentos
     c.execute("""
     CREATE TABLE IF NOT EXISTS agendamentos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cliente_id INTEGER,
+        id SERIAL PRIMARY KEY,
+        cliente_id INTEGER REFERENCES clientes(id),
         data TEXT,
         hora TEXT,
-        status TEXT DEFAULT 'ativo',
-        FOREIGN KEY (cliente_id) REFERENCES clientes (id)
+        status TEXT DEFAULT 'ativo'
     )
     """)
 
@@ -43,13 +52,13 @@ def buscar_clientes():
     if not query:
         return jsonify([])
 
-    conn = sqlite3.connect("agenda.db")
+    conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT id, nome FROM clientes WHERE nome LIKE ?", ('%' + query + '%',))
+    c.execute("SELECT id, nome FROM clientes WHERE nome ILIKE %s", ('%' + query + '%',))
     clientes = c.fetchall()
     conn.close()
 
-    resultado = [{"id": cid, "nome": nome} for cid, nome in clientes]
+    resultado = [{"id": c["id"], "nome": c["nome"]} for c in clientes]
     return jsonify(resultado)
 
 # =====================================================
@@ -57,13 +66,13 @@ def buscar_clientes():
 # =====================================================
 @app.route("/clientes", methods=["GET", "POST"])
 def clientes():
-    conn = sqlite3.connect("agenda.db")
+    conn = get_conn()
     c = conn.cursor()
 
     if request.method == "POST":
         nome = request.form["nome"]
         telefone = request.form["telefone"]
-        c.execute("INSERT INTO clientes (nome, telefone) VALUES (?, ?)", (nome, telefone))
+        c.execute("INSERT INTO clientes (nome, telefone) VALUES (%s, %s)", (nome, telefone))
         conn.commit()
         return redirect(url_for("clientes"))
 
@@ -78,14 +87,14 @@ def clientes():
 # =====================================================
 @app.route("/agendamentos", methods=["GET", "POST"])
 def agendamentos():
-    conn = sqlite3.connect("agenda.db")
+    conn = get_conn()
     c = conn.cursor()
 
     if request.method == "POST":
         cliente_id = request.form["cliente_id"]
         data = request.form["data"]
         hora = request.form["hora"]
-        c.execute("INSERT INTO agendamentos (cliente_id, data, hora) VALUES (?, ?, ?)", (cliente_id, data, hora))
+        c.execute("INSERT INTO agendamentos (cliente_id, data, hora) VALUES (%s, %s, %s)", (cliente_id, data, hora))
         conn.commit()
         return redirect(url_for("agendamentos"))
 
@@ -98,7 +107,7 @@ def agendamentos():
     """)
     agendamentos = c.fetchall()
 
-    # Listar todos os clientes (para fallback ou debug)
+    # Listar todos os clientes
     c.execute("SELECT * FROM clientes")
     clientes = c.fetchall()
     conn.close()
@@ -110,18 +119,18 @@ def agendamentos():
 # =====================================================
 @app.route("/finalizar/<int:agendamento_id>")
 def finalizar(agendamento_id):
-    conn = sqlite3.connect("agenda.db")
+    conn = get_conn()
     c = conn.cursor()
-    c.execute("UPDATE agendamentos SET status='finalizado' WHERE id=?", (agendamento_id,))
+    c.execute("UPDATE agendamentos SET status='finalizado' WHERE id=%s", (agendamento_id,))
     conn.commit()
     conn.close()
     return redirect(url_for("agendamentos"))
 
 @app.route("/desmarcar/<int:agendamento_id>")
 def desmarcar(agendamento_id):
-    conn = sqlite3.connect("agenda.db")
+    conn = get_conn()
     c = conn.cursor()
-    c.execute("UPDATE agendamentos SET status='desmarcado' WHERE id=?", (agendamento_id,))
+    c.execute("UPDATE agendamentos SET status='desmarcado' WHERE id=%s", (agendamento_id,))
     conn.commit()
     conn.close()
     return redirect(url_for("agendamentos"))
@@ -131,13 +140,13 @@ def desmarcar(agendamento_id):
 # =====================================================
 @app.route("/finalizados")
 def finalizados():
-    conn = sqlite3.connect("agenda.db")
+    conn = get_conn()
     c = conn.cursor()
     c.execute("""
-    SELECT ag.id, cl.nome, ag.data, ag.hora 
+    SELECT ag.id, cl.nome, ag.data, ag.hora
     FROM agendamentos ag
     JOIN clientes cl ON ag.cliente_id = cl.id
-    WHERE ag.status = 'finalizado'
+    WHERE ag.status='finalizado'
     """)
     finalizados = c.fetchall()
     conn.close()
@@ -146,13 +155,13 @@ def finalizados():
 
 @app.route("/desmarcados")
 def desmarcados():
-    conn = sqlite3.connect("agenda.db")
+    conn = get_conn()
     c = conn.cursor()
     c.execute("""
-    SELECT ag.id, cl.nome, ag.data, ag.hora 
+    SELECT ag.id, cl.nome, ag.data, ag.hora
     FROM agendamentos ag
     JOIN clientes cl ON ag.cliente_id = cl.id
-    WHERE ag.status = 'desmarcado'
+    WHERE ag.status='desmarcado'
     """)
     desmarcados = c.fetchall()
     conn.close()
