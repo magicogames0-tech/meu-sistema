@@ -1,0 +1,27 @@
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    # Tabela de clientes
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS clientes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        telefone TEXT
+    )
+    """)
+
+    # Tabela de agendamentos
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS agendamentos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cliente_id INTEGER,
+        data TEXT,
+        hora TEXT,
+        status TEXT DEFAULT 'ativo',
+        FOREIGN KEY (cliente_id) REFERENCES clientes (id)
+    )
+    """)
+
+    conn.commit()
+    conn.close()
