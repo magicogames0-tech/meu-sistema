@@ -6,9 +6,9 @@ from psycopg2.extras import RealDictCursor
 app = Flask(__name__)
 
 # =====================================================
-# Conexão com o PostgreSQL
+# Conexão com o banco de dados
 # =====================================================
-DATABASE_URL = os.environ.get("postgresql://agenda_bfpj_user:nnaFn93ToyugzE42iziNrOjs5SKsuURE@dpg-d37m63umcj7s73fo851g-a/agenda_bfpj")  # pega do Render
+DATABASE_URL = os.environ.get("postgresql://agenda_bfpj_user:nnaFn93ToyugzE42iziNrOjs5SKsuURE@dpg-d37m63umcj7s73fo851g-a/agenda_bfpj")
 
 def get_conn():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
@@ -58,7 +58,7 @@ def buscar_clientes():
     clientes = c.fetchall()
     conn.close()
 
-    resultado = [{"id": c["id"], "nome": c["nome"]} for c in clientes]
+    resultado = [{"id": cliente["id"], "nome": cliente["nome"]} for cliente in clientes]
     return jsonify(resultado)
 
 # =====================================================
@@ -94,7 +94,10 @@ def agendamentos():
         cliente_id = request.form["cliente_id"]
         data = request.form["data"]
         hora = request.form["hora"]
-        c.execute("INSERT INTO agendamentos (cliente_id, data, hora) VALUES (%s, %s, %s)", (cliente_id, data, hora))
+        c.execute(
+            "INSERT INTO agendamentos (cliente_id, data, hora) VALUES (%s, %s, %s)",
+            (cliente_id, data, hora)
+        )
         conn.commit()
         return redirect(url_for("agendamentos"))
 
@@ -143,10 +146,10 @@ def finalizados():
     conn = get_conn()
     c = conn.cursor()
     c.execute("""
-    SELECT ag.id, cl.nome, ag.data, ag.hora
+    SELECT ag.id, cl.nome, ag.data, ag.hora 
     FROM agendamentos ag
     JOIN clientes cl ON ag.cliente_id = cl.id
-    WHERE ag.status='finalizado'
+    WHERE ag.status = 'finalizado'
     """)
     finalizados = c.fetchall()
     conn.close()
@@ -158,10 +161,10 @@ def desmarcados():
     conn = get_conn()
     c = conn.cursor()
     c.execute("""
-    SELECT ag.id, cl.nome, ag.data, ag.hora
+    SELECT ag.id, cl.nome, ag.data, ag.hora 
     FROM agendamentos ag
     JOIN clientes cl ON ag.cliente_id = cl.id
-    WHERE ag.status='desmarcado'
+    WHERE ag.status = 'desmarcado'
     """)
     desmarcados = c.fetchall()
     conn.close()
