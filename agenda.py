@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 import sqlite3
 
 app = Flask(__name__)
@@ -33,6 +33,24 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+# =====================================================
+# Rota de busca de clientes para autocomplete
+# =====================================================
+@app.route("/buscar_clientes")
+def buscar_clientes():
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify([])
+
+    conn = sqlite3.connect("agenda.db")
+    c = conn.cursor()
+    c.execute("SELECT id, nome FROM clientes WHERE nome LIKE ?", ('%' + query + '%',))
+    clientes = c.fetchall()
+    conn.close()
+
+    resultado = [{"id": cid, "nome": nome} for cid, nome in clientes]
+    return jsonify(resultado)
 
 # =====================================================
 # Rotas de Clientes
@@ -71,6 +89,7 @@ def agendamentos():
         conn.commit()
         return redirect(url_for("agendamentos"))
 
+    # Listar agendamentos ativos
     c.execute("""
     SELECT ag.id, cl.nome, ag.data, ag.hora, ag.status
     FROM agendamentos ag
@@ -79,6 +98,7 @@ def agendamentos():
     """)
     agendamentos = c.fetchall()
 
+    # Listar todos os clientes (para fallback ou debug)
     c.execute("SELECT * FROM clientes")
     clientes = c.fetchall()
     conn.close()
