@@ -1,62 +1,59 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
-    <h2>📅 Agendamentos</h2>
+<h2>📅 Agendamentos</h2>
 
-    <!-- Formulário de Agendamento -->
-    <form method="POST">
-        <div class="mb-3">
-            <label for="cliente">Cliente:</label>
-            <input type="text" id="cliente" placeholder="Digite o nome do cliente" autocomplete="off" class="form-control" required>
-            <input type="hidden" name="cliente_id" id="cliente_id">
-            <ul id="lista-clientes" class="list-group mt-1"></ul>
-        </div>
+<form method="POST" action="{{ url_for('agendamentos_view') }}">
+    <div class="mb-3">
+        <label for="cliente">Cliente:</label>
+        <input type="text" id="cliente" placeholder="Digite o nome do cliente" autocomplete="off" class="form-control">
+        <input type="hidden" name="cliente_id" id="cliente_id">
+        <ul id="lista-clientes" class="list-group mt-1"></ul>
+    </div>
 
-        <div class="mb-3">
-            <label for="data">Data:</label>
-            <input type="date" name="data" required class="form-control">
-        </div>
+    <div class="mb-3">
+        <label for="data">Data:</label>
+        <input type="date" name="data" required class="form-control">
+    </div>
 
-        <div class="mb-3">
-            <label for="hora">Hora:</label>
-            <input type="time" name="hora" required class="form-control">
-        </div>
+    <div class="mb-3">
+        <label for="hora">Hora:</label>
+        <input type="time" name="hora" required class="form-control">
+    </div>
 
-        <button type="submit" class="btn btn-primary">Agendar</button>
-    </form>
+    <button type="submit" class="btn btn-primary">Agendar</button>
+</form>
 
-    <hr>
+<hr>
 
-    <h3>Agendamentos Ativos</h3>
-    <table class="table table-striped mt-3">
-        <thead>
-            <tr>
-                <th>Cliente</th>
-                <th>Data</th>
-                <th>Hora</th>
-                <th>Status</th>
-                <th>Ações</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for ag in agendamentos %}
-            <tr>
-                <td>{{ ag[1] }}</td>
-                <td>{{ ag[2] }}</td>
-                <td>{{ ag[3] }}</td>
-                <td>{{ ag[4] }}</td>
-                <td>
-                    {% if ag[4] != "Finalizado" %}
-                        <a href="{{ url_for('finalizar', agendamento_id=ag[0]) }}" class="btn btn-success btn-sm">Finalizar</a>
-                    {% endif %}
-                    <a href="{{ url_for('desmarcar', agendamento_id=ag[0]) }}" class="btn btn-danger btn-sm">Desmarcar</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+<h3>Agendamentos Ativos</h3>
+<table class="table table-striped mt-3">
+    <thead>
+        <tr>
+            <th>Cliente</th>
+            <th>Data</th>
+            <th>Hora</th>
+            <th>Status</th>
+            <th>Ações</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ag in agendamentos %}
+        <tr>
+            <td>{{ ag['nome'] }}</td>
+            <td>{{ ag['data'] }}</td>
+            <td>{{ ag['hora'] }}</td>
+            <td>{{ ag['status'] }}</td>
+            <td>
+                <a href="{{ url_for('finalizar_view', agendamento_id=ag['id']) }}" class="btn btn-success btn-sm">Finalizar</a>
+                <a href="{{ url_for('desmarcar_view', agendamento_id=ag['id']) }}" class="btn btn-danger btn-sm">Desmarcar</a>
+                <a href="{{ url_for('editar_agendamento_view', agendamento_id=ag['id']) }}" class="btn btn-warning btn-sm">Editar</a>
+                <a href="{{ url_for('excluir_agendamento_view', agendamento_id=ag['id']) }}" class="btn btn-secondary btn-sm">Excluir</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 
 <script>
 const input = document.getElementById('cliente');
@@ -65,7 +62,7 @@ const lista = document.getElementById('lista-clientes');
 
 input.addEventListener('input', async () => {
     const query = input.value.trim();
-    if(query.length < 1){
+    if(query.length < 2){
         lista.innerHTML = '';
         hiddenId.value = '';
         return;
