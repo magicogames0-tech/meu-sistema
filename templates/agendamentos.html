@@ -1,17 +1,60 @@
-<form method="POST">
-    <label for="cliente">Cliente:</label>
-    <input type="text" id="cliente" placeholder="Digite o nome do cliente" autocomplete="off">
-    <input type="hidden" name="cliente_id" id="cliente_id">
-    <ul id="lista-clientes" class="list-group mt-1"></ul>
+{% extends "base.html" %}
 
-    <label for="data">Data:</label>
-    <input type="date" name="data" required>
+{% block content %}
+<div class="container mt-4">
+    <h2>📅 Agendamentos</h2>
 
-    <label for="hora">Hora:</label>
-    <input type="time" name="hora" required>
+    <!-- Formulário de Agendamento -->
+    <form method="POST">
+        <div class="mb-3">
+            <label for="cliente">Cliente:</label>
+            <input type="text" id="cliente" placeholder="Digite o nome do cliente" autocomplete="off" class="form-control">
+            <input type="hidden" name="cliente_id" id="cliente_id">
+            <ul id="lista-clientes" class="list-group mt-1"></ul>
+        </div>
 
-    <button type="submit">Agendar</button>
-</form>
+        <div class="mb-3">
+            <label for="data">Data:</label>
+            <input type="date" name="data" required class="form-control">
+        </div>
+
+        <div class="mb-3">
+            <label for="hora">Hora:</label>
+            <input type="time" name="hora" required class="form-control">
+        </div>
+
+        <button type="submit" class="btn btn-primary">Agendar</button>
+    </form>
+
+    <hr>
+
+    <h3>Agendamentos Ativos</h3>
+    <table class="table table-striped mt-3">
+        <thead>
+            <tr>
+                <th>Cliente</th>
+                <th>Data</th>
+                <th>Hora</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ag in agendamentos %}
+            <tr>
+                <td>{{ ag[1] }}</td>
+                <td>{{ ag[2] }}</td>
+                <td>{{ ag[3] }}</td>
+                <td>{{ ag[4] }}</td>
+                <td>
+                    <a href="{{ url_for('finalizar', agendamento_id=ag[0]) }}" class="btn btn-success btn-sm">Finalizar</a>
+                    <a href="{{ url_for('desmarcar', agendamento_id=ag[0]) }}" class="btn btn-danger btn-sm">Desmarcar</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 
 <script>
 const input = document.getElementById('cliente');
@@ -47,3 +90,4 @@ input.addEventListener('input', async () => {
     }
 });
 </script>
+{% endblock %}
