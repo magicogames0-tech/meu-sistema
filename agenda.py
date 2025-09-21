@@ -266,10 +266,15 @@ def home():
     return redirect(url_for("agendamentos"))
 
 # =====================================================
+# Inicialização do banco antes de cada request
+# =====================================================
+@app.before_request
+def before_request():
+    init_db()
+
+# =====================================================
 # Inicialização
 # =====================================================
-# Garante que as tabelas existam sempre, mesmo no Render
-init_db()
-
 if __name__ == "__main__":
+    init_db()
     app.run(host="0.0.0.0", port=5000)
