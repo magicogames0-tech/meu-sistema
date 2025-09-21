@@ -266,10 +266,10 @@ def home():
     return redirect(url_for("agendamentos"))
 
 # =====================================================
-# Inicialização do banco antes de cada request
+# Inicialização do banco antes da 1ª request
 # =====================================================
-@app.before_request
-def before_request():
+@app.before_first_request
+def setup():
     init_db()
 
 # =====================================================
