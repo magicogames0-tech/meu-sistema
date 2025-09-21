@@ -6,7 +6,7 @@ from psycopg2.extras import RealDictCursor
 app = Flask(__name__)
 
 # =====================================================
-# Conexão com o banco de dados
+# Configurar banco de dados PostgreSQL
 # =====================================================
 DATABASE_URL = os.environ.get("postgresql://agenda_bfpj_user:nnaFn93ToyugzE42iziNrOjs5SKsuURE@dpg-d37m63umcj7s73fo851g-a/agenda_bfpj")
 
@@ -58,7 +58,7 @@ def buscar_clientes():
     clientes = c.fetchall()
     conn.close()
 
-    resultado = [{"id": cliente["id"], "nome": cliente["nome"]} for cliente in clientes]
+    resultado = [{"id": cid, "nome": nome} for cid, nome in clientes]
     return jsonify(resultado)
 
 # =====================================================
@@ -74,6 +74,7 @@ def clientes():
         telefone = request.form["telefone"]
         c.execute("INSERT INTO clientes (nome, telefone) VALUES (%s, %s)", (nome, telefone))
         conn.commit()
+        conn.close()
         return redirect(url_for("clientes"))
 
     c.execute("SELECT * FROM clientes")
@@ -94,11 +95,10 @@ def agendamentos():
         cliente_id = request.form["cliente_id"]
         data = request.form["data"]
         hora = request.form["hora"]
-        c.execute(
-            "INSERT INTO agendamentos (cliente_id, data, hora) VALUES (%s, %s, %s)",
-            (cliente_id, data, hora)
-        )
+        c.execute("INSERT INTO agendamentos (cliente_id, data, hora) VALUES (%s, %s, %s)",
+                  (cliente_id, data, hora))
         conn.commit()
+        conn.close()
         return redirect(url_for("agendamentos"))
 
     # Listar agendamentos ativos
