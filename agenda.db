@@ -1,8 +1,21 @@
+import os
+import sqlite3
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "agenda.db")
+
+# Se o arquivo existir mas não for um banco válido, remove
+if os.path.exists(DB_PATH):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("PRAGMA schema_version;")
+        conn.close()
+    except sqlite3.DatabaseError:
+        os.remove(DB_PATH)  # deleta arquivo corrompido
+
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-
-    # Tabela de clientes
     c.execute("""
     CREATE TABLE IF NOT EXISTS clientes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -10,8 +23,6 @@ def init_db():
         telefone TEXT
     )
     """)
-
-    # Tabela de agendamentos
     c.execute("""
     CREATE TABLE IF NOT EXISTS agendamentos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,6 +33,5 @@ def init_db():
         FOREIGN KEY (cliente_id) REFERENCES clientes (id)
     )
     """)
-
     conn.commit()
     conn.close()
