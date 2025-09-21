@@ -266,15 +266,12 @@ def home():
     return redirect(url_for("agendamentos"))
 
 # =====================================================
-# Inicialização do banco antes da 1ª request
-# =====================================================
-@app.before_first_request
-def setup():
-    init_db()
-
-# =====================================================
 # Inicialização
 # =====================================================
 if __name__ == "__main__":
     init_db()
     app.run(host="0.0.0.0", port=5000)
+else:
+    # Quando rodar no Gunicorn (Render), também cria o banco
+    with app.app_context():
+        init_db()
