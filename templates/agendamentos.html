@@ -42,13 +42,13 @@
         <tbody>
             {% for ag in agendamentos %}
             <tr>
-                <td>{{ ag[1] }}</td>
-                <td>{{ ag[2] }}</td>
-                <td>{{ ag[3] }}</td>
-                <td>{{ ag[4] }}</td>
+                <td>{{ ag.cliente_nome }}</td>
+                <td>{{ ag.data }}</td>
+                <td>{{ ag.hora }}</td>
+                <td>{{ ag.status }}</td>
                 <td>
-                    <a href="{{ url_for('finalizar', agendamento_id=ag[0]) }}" class="btn btn-success btn-sm">Finalizar</a>
-                    <a href="{{ url_for('desmarcar', agendamento_id=ag[0]) }}" class="btn btn-danger btn-sm">Desmarcar</a>
+                    <a href="{{ url_for('finalizar', agendamento_id=ag.id) }}" class="btn btn-success btn-sm">Finalizar</a>
+                    <a href="{{ url_for('desmarcar', agendamento_id=ag.id) }}" class="btn btn-danger btn-sm">Desmarcar</a>
                 </td>
             </tr>
             {% endfor %}
