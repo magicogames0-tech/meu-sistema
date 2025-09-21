@@ -44,6 +44,11 @@ def init_db():
     conn.close()
 
 # =====================================================
+# Executa a inicialização das tabelas sempre que o app inicia
+# =====================================================
+init_db()
+
+# =====================================================
 # Rota de busca de clientes para autocomplete
 # =====================================================
 @app.route("/buscar_clientes")
@@ -180,10 +185,3 @@ def desmarcados():
 @app.route("/")
 def home():
     return redirect(url_for("agendamentos"))
-
-# =====================================================
-# Inicialização
-# =====================================================
-if __name__ == "__main__":
-    init_db()
-    # OBS: Não precisa de app.run() no Render, o Gunicorn cuidará disso
