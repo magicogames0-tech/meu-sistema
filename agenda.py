@@ -1,262 +1,273 @@
 from flask import Flask, render_template_string, request, redirect, url_for
 import sqlite3
-from datetime import datetime
 
 app = Flask(__name__)
 
-# --------------------- BANCO DE DADOS ---------------------
+# =====================================================
+# Inicializar banco de dados
+# =====================================================
 def init_db():
     conn = sqlite3.connect("agenda.db")
-    cur = conn.cursor()
-    # tabela de clientes
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS clientes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            telefone TEXT
-        )
+    c = conn.cursor()
+
+    # Tabela de clientes
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS clientes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        telefone TEXT
+    )
     """)
-    # tabela de agendamentos
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS agendamentos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            cliente_id INTEGER,
-            data TEXT NOT NULL,
-            hora TEXT NOT NULL,
-            status TEXT DEFAULT 'ativo',
-            FOREIGN KEY(cliente_id) REFERENCES clientes(id)
-        )
+
+    # Tabela de agendamentos
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS agendamentos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cliente_id INTEGER,
+        data TEXT,
+        hora TEXT,
+        status TEXT DEFAULT 'ativo',
+        FOREIGN KEY (cliente_id) REFERENCES clientes (id)
+    )
     """)
+
     conn.commit()
     conn.close()
 
-def query(sql, params=(), fetch=False):
-    conn = sqlite3.connect("agenda.db")
-    cur = conn.cursor()
-    cur.execute(sql, params)
-    data = cur.fetchall() if fetch else None
-    conn.commit()
-    conn.close()
-    return data
-
-# --------------------- BASE TEMPLATE ---------------------
-base_html = """
+# =====================================================
+# Template base
+# =====================================================
+template = """
 <!DOCTYPE html>
-<html lang="pt-br">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>{{ title }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Agenda Online</title>
+    <style>
+        body { font-family: Arial; background: #f5f5f5; margin: 0; padding: 0; }
+        .navbar { background: #333; padding: 10px; text-align: center; }
+        .navbar a { color: white; margin: 0 15px; text-decoration: none; font-weight: bold; }
+        .container { max-width: 800px; margin: 30px auto; background: white; padding: 20px; border-radius: 10px; }
+        h2 { text-align: center; }
+        input, select { width: 100%; padding: 8px; margin: 5px 0; }
+        button { background: green; color: white; padding: 10px; border: none; border-radius: 5px; cursor: pointer; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background: #eee; }
+        .btn { padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-red { background: red; color: white; }
+        .btn-blue { background: blue; color: white; }
+    </style>
 </head>
-<body class="bg-light">
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="{{ url_for('clientes') }}">📅 Agenda</a>
-    <div>
-      <a class="btn btn-outline-light btn-sm" href="{{ url_for('clientes') }}">👤 Clientes</a>
-      <a class="btn btn-outline-light btn-sm" href="{{ url_for('agendamentos') }}">📅 Agendamentos</a>
-      <a class="btn btn-outline-light btn-sm" href="{{ url_for('historico') }}">📂 Histórico</a>
+<body>
+    <div class="navbar">
+        <a href="{{ url_for('clientes') }}">👤 Clientes</a>
+        <a href="{{ url_for('agendamentos') }}">📅 Agendamentos</a>
+        <a href="{{ url_for('finalizados') }}">✅ Finalizados</a>
+        <a href="{{ url_for('desmarcados') }}">❌ Desmarcados</a>
     </div>
-  </div>
-</nav>
-<div class="container">
-    {% block content %}{% endblock %}
-</div>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
 </body>
 </html>
 """
 
-# --------------------- TEMPLATES ---------------------
-tpl_clientes = """
-{% extends "base" %}
-{% block content %}
-<h2>👤 Cadastro de Clientes</h2>
-<form method="post" class="card p-3 shadow-sm mb-4">
-    <div class="mb-2">
-        <label class="form-label">Nome</label>
-        <input type="text" name="nome" class="form-control" required>
-    </div>
-    <div class="mb-2">
-        <label class="form-label">Telefone</label>
-        <input type="text" name="telefone" class="form-control">
-    </div>
-    <button type="submit" class="btn btn-success">Cadastrar</button>
-</form>
-<h3>Lista de Clientes</h3>
-<table class="table table-striped table-bordered shadow-sm">
-    <tr><th>Nome</th><th>Telefone</th></tr>
-    {% for c in clientes %}
-    <tr><td>{{ c[1] }}</td><td>{{ c[2] if c[2] else "-" }}</td></tr>
-    {% endfor %}
-</table>
-{% endblock %}
-"""
-
-tpl_agendamentos = """
-{% extends "base" %}
-{% block content %}
-<h2>📅 Agendamentos</h2>
-
-<!-- Formulário de novo agendamento -->
-<form method="post" class="card p-3 shadow-sm mb-4">
-    <h5>Novo Agendamento</h5>
-    <div class="mb-2">
-        <label class="form-label">Cliente</label>
-        <select name="cliente_id" class="form-select" required>
-            {% for c in clientes %}
-                <option value="{{ c[0] }}">{{ c[1] }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div class="mb-2">
-        <label class="form-label">Data</label>
-        <input type="date" name="data" class="form-control" required>
-    </div>
-    <div class="mb-2">
-        <label class="form-label">Hora</label>
-        <input type="time" name="hora" class="form-control" required>
-    </div>
-    <button type="submit" class="btn btn-primary">Agendar</button>
-</form>
-
-<!-- Filtro de busca -->
-<form method="get" class="card p-3 shadow-sm mb-4">
-    <h5>🔎 Buscar Agendamentos</h5>
-    <div class="row g-2">
-        <div class="col-md-6">
-            <input type="text" name="cliente" value="{{ request.args.get('cliente','') }}" placeholder="Nome do cliente" class="form-control">
-        </div>
-        <div class="col-md-4">
-            <input type="date" name="data" value="{{ request.args.get('data','') }}" class="form-control">
-        </div>
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-dark w-100">Filtrar</button>
-        </div>
-    </div>
-</form>
-
-<!-- Lista de agendamentos -->
-<h3>Agendamentos Ativos</h3>
-<table class="table table-striped table-bordered shadow-sm">
-    <tr><th>Cliente</th><th>Data</th><th>Hora</th><th>Ações</th></tr>
-    {% for a in agendamentos %}
-    <tr>
-        <td>{{ a[1] }}</td>
-        <td>{{ a[2] }}</td>
-        <td>{{ a[3] }}</td>
-        <td>
-            <a href="{{ url_for('finalizar', ag_id=a[0]) }}" class="btn btn-sm btn-success">✅ Finalizar</a>
-            <a href="{{ url_for('cancelar', ag_id=a[0]) }}" class="btn btn-sm btn-danger">❌ Cancelar</a>
-        </td>
-    </tr>
-    {% endfor %}
-    {% if not agendamentos %}
-    <tr><td colspan="4">Nenhum agendamento encontrado</td></tr>
-    {% endif %}
-</table>
-{% endblock %}
-"""
-
-tpl_historico = """
-{% extends "base" %}
-{% block content %}
-<h2>📂 Histórico do Dia</h2>
-<h3 class="text-success">✅ Finalizados</h3>
-<ul class="list-group mb-3 shadow-sm">
-    {% for f in finalizados %}
-        <li class="list-group-item">{{ f[1] }} - {{ f[2] }} {{ f[3] }}</li>
-    {% endfor %}
-    {% if not finalizados %}<li class="list-group-item">Nenhum finalizado hoje</li>{% endif %}
-</ul>
-
-<h3 class="text-danger">❌ Cancelados</h3>
-<ul class="list-group shadow-sm">
-    {% for c in cancelados %}
-        <li class="list-group-item">{{ c[1] }} - {{ c[2] }} {{ c[3] }}</li>
-    {% endfor %}
-    {% if not cancelados %}<li class="list-group-item">Nenhum cancelado hoje</li>{% endif %}
-</ul>
-{% endblock %}
-"""
-
-# --------------------- ROTAS ---------------------
-@app.route("/")
-def home():
-    return redirect(url_for("clientes"))
-
+# =====================================================
+# Rotas de Clientes
+# =====================================================
 @app.route("/clientes", methods=["GET", "POST"])
 def clientes():
+    conn = sqlite3.connect("agenda.db")
+    c = conn.cursor()
+
     if request.method == "POST":
         nome = request.form["nome"]
-        telefone = request.form.get("telefone")
-        query("INSERT INTO clientes (nome, telefone) VALUES (?, ?)", (nome, telefone))
+        telefone = request.form["telefone"]
+        c.execute("INSERT INTO clientes (nome, telefone) VALUES (?, ?)", (nome, telefone))
+        conn.commit()
         return redirect(url_for("clientes"))
-    clientes = query("SELECT * FROM clientes", fetch=True)
-    return render_template_string(tpl_clientes, clientes=clientes, title="Clientes", base=base_html)
 
+    c.execute("SELECT * FROM clientes")
+    clientes = c.fetchall()
+    conn.close()
+
+    return render_template_string(template + """
+    {% block content %}
+    <h2>👤 Cadastro de Clientes</h2>
+    <form method="post">
+        Nome: <input type="text" name="nome" required><br>
+        Telefone: <input type="text" name="telefone"><br>
+        <button type="submit">Cadastrar</button>
+    </form>
+    <h3>Lista de Clientes</h3>
+    <table>
+        <tr><th>ID</th><th>Nome</th><th>Telefone</th></tr>
+        {% for c in clientes %}
+        <tr>
+            <td>{{ c[0] }}</td>
+            <td>{{ c[1] }}</td>
+            <td>{{ c[2] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endblock %}
+    """, clientes=clientes)
+
+# =====================================================
+# Rotas de Agendamento
+# =====================================================
 @app.route("/agendamentos", methods=["GET", "POST"])
 def agendamentos():
+    conn = sqlite3.connect("agenda.db")
+    c = conn.cursor()
+
     if request.method == "POST":
         cliente_id = request.form["cliente_id"]
         data = request.form["data"]
         hora = request.form["hora"]
-        query("INSERT INTO agendamentos (cliente_id, data, hora) VALUES (?, ?, ?)", (cliente_id, data, hora))
+        c.execute("INSERT INTO agendamentos (cliente_id, data, hora) VALUES (?, ?, ?)", (cliente_id, data, hora))
+        conn.commit()
         return redirect(url_for("agendamentos"))
 
-    # Filtros da busca
-    cliente_filtro = request.args.get("cliente", "").strip()
-    data_filtro = request.args.get("data", "").strip()
+    c.execute("""
+    SELECT ag.id, cl.nome, ag.data, ag.hora, ag.status
+    FROM agendamentos ag
+    JOIN clientes cl ON ag.cliente_id = cl.id
+    WHERE ag.status = 'ativo'
+    """)
+    agendamentos = c.fetchall()
 
-    sql = """SELECT a.id, c.nome, a.data, a.hora 
-             FROM agendamentos a
-             JOIN clientes c ON c.id=a.cliente_id
-             WHERE a.status='ativo' """
-    params = []
+    c.execute("SELECT * FROM clientes")
+    clientes = c.fetchall()
+    conn.close()
 
-    if cliente_filtro:
-        sql += " AND c.nome LIKE ?"
-        params.append(f"%{cliente_filtro}%")
+    return render_template_string(template + """
+    {% block content %}
+    <h2>📅 Agendamentos</h2>
+    <form method="post">
+        Cliente:
+        <select name="cliente_id" required>
+            {% for c in clientes %}
+            <option value="{{ c[0] }}">{{ c[1] }}</option>
+            {% endfor %}
+        </select><br>
+        Data: <input type="date" name="data" required><br>
+        Hora: <input type="time" name="hora" required><br>
+        <button type="submit">Agendar</button>
+    </form>
+    <h3>Lista de Agendamentos</h3>
+    <table>
+        <tr><th>ID</th><th>Cliente</th><th>Data</th><th>Hora</th><th>Ações</th></tr>
+        {% for ag in agendamentos %}
+        <tr>
+            <td>{{ ag[0] }}</td>
+            <td>{{ ag[1] }}</td>
+            <td>{{ ag[2] }}</td>
+            <td>{{ ag[3] }}</td>
+            <td>
+                <a href="{{ url_for('finalizar', agendamento_id=ag[0]) }}"><button class="btn btn-blue">Finalizar</button></a>
+                <a href="{{ url_for('desmarcar', agendamento_id=ag[0]) }}"><button class="btn btn-red">Desmarcar</button></a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endblock %}
+    """, agendamentos=agendamentos, clientes=clientes)
 
-    if data_filtro:
-        sql += " AND a.data=?"
-        params.append(data_filtro)
-
-    sql += " ORDER BY a.data, a.hora"
-    agendamentos = query(sql, tuple(params), fetch=True)
-
-    clientes = query("SELECT * FROM clientes", fetch=True)
-    return render_template_string(
-        tpl_agendamentos,
-        clientes=clientes,
-        agendamentos=agendamentos,
-        title="Agendamentos",
-        base=base_html
-    )
-
-@app.route("/finalizar/<int:ag_id>")
-def finalizar(ag_id):
-    query("UPDATE agendamentos SET status='finalizado' WHERE id=?", (ag_id,))
+# =====================================================
+# Finalizar / Desmarcar
+# =====================================================
+@app.route("/finalizar/<int:agendamento_id>")
+def finalizar(agendamento_id):
+    conn = sqlite3.connect("agenda.db")
+    c = conn.cursor()
+    c.execute("UPDATE agendamentos SET status='finalizado' WHERE id=?", (agendamento_id,))
+    conn.commit()
+    conn.close()
     return redirect(url_for("agendamentos"))
 
-@app.route("/cancelar/<int:ag_id>")
-def cancelar(ag_id):
-    query("UPDATE agendamentos SET status='cancelado' WHERE id=?", (ag_id,))
+@app.route("/desmarcar/<int:agendamento_id>")
+def desmarcar(agendamento_id):
+    conn = sqlite3.connect("agenda.db")
+    c = conn.cursor()
+    c.execute("UPDATE agendamentos SET status='desmarcado' WHERE id=?", (agendamento_id,))
+    conn.commit()
+    conn.close()
     return redirect(url_for("agendamentos"))
 
-@app.route("/historico")
-def historico():
-    hoje = datetime.now().date().isoformat()
-    finalizados = query("""SELECT a.id, c.nome, a.data, a.hora 
-                           FROM agendamentos a 
-                           JOIN clientes c ON c.id=a.cliente_id
-                           WHERE a.status='finalizado' AND a.data=?""", (hoje,), fetch=True)
-    cancelados = query("""SELECT a.id, c.nome, a.data, a.hora 
-                           FROM agendamentos a 
-                           JOIN clientes c ON c.id=a.cliente_id
-                           WHERE a.status='cancelado' AND a.data=?""", (hoje,), fetch=True)
-    return render_template_string(tpl_historico, finalizados=finalizados, cancelados=cancelados, title="Histórico", base=base_html)
+# =====================================================
+# Listas de Finalizados e Desmarcados
+# =====================================================
+@app.route("/finalizados")
+def finalizados():
+    conn = sqlite3.connect("agenda.db")
+    c = conn.cursor()
+    c.execute("""
+    SELECT ag.id, cl.nome, ag.data, ag.hora 
+    FROM agendamentos ag
+    JOIN clientes cl ON ag.cliente_id = cl.id
+    WHERE ag.status = 'finalizado'
+    """)
+    finalizados = c.fetchall()
+    conn.close()
 
-# --------------------- MAIN ---------------------
+    return render_template_string(template + """
+    {% block content %}
+    <h2>✅ Agendamentos Finalizados</h2>
+    <table>
+        <tr><th>ID</th><th>Cliente</th><th>Data</th><th>Hora</th></tr>
+        {% for ag in finalizados %}
+        <tr>
+            <td>{{ ag[0] }}</td>
+            <td>{{ ag[1] }}</td>
+            <td>{{ ag[2] }}</td>
+            <td>{{ ag[3] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endblock %}
+    """, finalizados=finalizados)
+
+@app.route("/desmarcados")
+def desmarcados():
+    conn = sqlite3.connect("agenda.db")
+    c = conn.cursor()
+    c.execute("""
+    SELECT ag.id, cl.nome, ag.data, ag.hora 
+    FROM agendamentos ag
+    JOIN clientes cl ON ag.cliente_id = cl.id
+    WHERE ag.status = 'desmarcado'
+    """)
+    desmarcados = c.fetchall()
+    conn.close()
+
+    return render_template_string(template + """
+    {% block content %}
+    <h2>❌ Agendamentos Desmarcados</h2>
+    <table>
+        <tr><th>ID</th><th>Cliente</th><th>Data</th><th>Hora</th></tr>
+        {% for ag in desmarcados %}
+        <tr>
+            <td>{{ ag[0] }}</td>
+            <td>{{ ag[1] }}</td>
+            <td>{{ ag[2] }}</td>
+            <td>{{ ag[3] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endblock %}
+    """, desmarcados=desmarcados)
+
+# =====================================================
+# Home
+# =====================================================
+@app.route("/")
+def home():
+    return redirect(url_for("agendamentos"))
+
+# =====================================================
+# Inicialização
+# =====================================================
 if __name__ == "__main__":
     init_db()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000)
