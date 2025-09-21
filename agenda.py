@@ -58,7 +58,6 @@ def buscar_clientes():
     clientes = c.fetchall()
     conn.close()
 
-    # Corrigido para pegar os valores do RealDictCursor
     resultado = [{"id": cliente["id"], "nome": cliente["nome"]} for cliente in clientes]
     return jsonify(resultado)
 
@@ -83,6 +82,37 @@ def clientes():
 
     return render_template("clientes.html", clientes=clientes)
 
+@app.route("/clientes/editar/<int:cliente_id>", methods=["GET", "POST"])
+def editar_cliente(cliente_id):
+    conn = get_conn()
+    c = conn.cursor()
+
+    if request.method == "POST":
+        nome = request.form["nome"]
+        telefone = request.form["telefone"]
+        c.execute("UPDATE clientes SET nome=%s, telefone=%s WHERE id=%s", (nome, telefone, cliente_id))
+        conn.commit()
+        conn.close()
+        return redirect(url_for("clientes"))
+
+    c.execute("SELECT * FROM clientes WHERE id=%s", (cliente_id,))
+    cliente = c.fetchone()
+    conn.close()
+
+    return render_template("editar_cliente.html", cliente=cliente)
+
+@app.route("/clientes/excluir/<int:cliente_id>")
+def excluir_cliente(cliente_id):
+    conn = get_conn()
+    c = conn.cursor()
+    # Primeiro exclui os agendamentos do cliente
+    c.execute("DELETE FROM agendamentos WHERE cliente_id=%s", (cliente_id,))
+    # Depois exclui o cliente
+    c.execute("DELETE FROM clientes WHERE id=%s", (cliente_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("clientes"))
+
 # =====================================================
 # Rotas de Agendamentos
 # =====================================================
@@ -102,25 +132,57 @@ def agendamentos():
         conn.commit()
         return redirect(url_for("agendamentos"))
 
-    # Listar agendamentos ativos
     c.execute("""
     SELECT ag.id, cl.nome, ag.data, ag.hora, ag.status
     FROM agendamentos ag
     JOIN clientes cl ON ag.cliente_id = cl.id
-    WHERE ag.status = 'ativo'
     ORDER BY ag.id DESC
     """)
     agendamentos = c.fetchall()
 
-    # Listar todos os clientes
     c.execute("SELECT * FROM clientes ORDER BY id DESC")
     clientes = c.fetchall()
     conn.close()
 
     return render_template("agendamentos.html", agendamentos=agendamentos, clientes=clientes)
 
+@app.route("/agendamentos/editar/<int:agendamento_id>", methods=["GET", "POST"])
+def editar_agendamento(agendamento_id):
+    conn = get_conn()
+    c = conn.cursor()
+
+    if request.method == "POST":
+        cliente_id = request.form["cliente_id"]
+        data = request.form["data"]
+        hora = request.form["hora"]
+        status = request.form.get("status", "ativo")
+        c.execute(
+            "UPDATE agendamentos SET cliente_id=%s, data=%s, hora=%s, status=%s WHERE id=%s",
+            (cliente_id, data, hora, status, agendamento_id)
+        )
+        conn.commit()
+        conn.close()
+        return redirect(url_for("agendamentos"))
+
+    c.execute("SELECT * FROM agendamentos WHERE id=%s", (agendamento_id,))
+    agendamento = c.fetchone()
+    c.execute("SELECT * FROM clientes ORDER BY id DESC")
+    clientes = c.fetchall()
+    conn.close()
+
+    return render_template("editar_agendamento.html", agendamento=agendamento, clientes=clientes)
+
+@app.route("/agendamentos/excluir/<int:agendamento_id>")
+def excluir_agendamento(agendamento_id):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("DELETE FROM agendamentos WHERE id=%s", (agendamento_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("agendamentos"))
+
 # =====================================================
-# Finalizar / Desmarcar
+# Alterar status do agendamento
 # =====================================================
 @app.route("/finalizar/<int:agendamento_id>")
 def finalizar(agendamento_id):
@@ -156,7 +218,6 @@ def finalizados():
     """)
     finalizados = c.fetchall()
     conn.close()
-
     return render_template("finalizados.html", finalizados=finalizados)
 
 @app.route("/desmarcados")
@@ -172,7 +233,6 @@ def desmarcados():
     """)
     desmarcados = c.fetchall()
     conn.close()
-
     return render_template("desmarcados.html", desmarcados=desmarcados)
 
 # =====================================================
@@ -187,4 +247,4 @@ def home():
 # =====================================================
 if __name__ == "__main__":
     init_db()
-    # No Render não precisa de app.run(); o Gunicorn cuidará disso
+    # app.run() não é necessário no Render
