@@ -8,7 +8,7 @@ app = Flask(__name__)
 # =====================================================
 # Configuração do Banco
 # =====================================================
-DATABASE_URL = os.environ.get("postgresql://agenda_bfpj_user:nnaFn93ToyugzE42iziNrOjs5SKsuURE@dpg-d37m63umcj7s73fo851g-a/agenda_bfpj")  # Pega do environment do Render
+DATABASE_URL = os.environ.get("DATABASE_URL")  # Pega do environment do Render
 
 def get_conn():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
