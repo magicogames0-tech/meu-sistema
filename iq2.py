@@ -153,7 +153,7 @@ def get_current_asset(now):
     weekday = now.weekday()  # 0 = segunda, 6 = domingo
     hour = now.hour
 
-    if weekday < 5 and 9 <= hour < 11:  # EURUSD mercado real
+    if weekday < 5 and 9 <= hour < 15:  # EURUSD mercado real
         return "EURUSD"
     if 20 <= hour < 23:  # OTC
         return "EURUSD-OTC"
