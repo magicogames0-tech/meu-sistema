@@ -153,7 +153,7 @@ def get_current_asset(now):
     weekday = now.weekday()  # 0 = segunda, 6 = domingo
     hour = now.hour
 
-    if weekday < 5 and 9 <= hour < 15:  # EURUSD mercado real
+    if weekday < 5 and 9 <= hour < 18:  # EURUSD mercado real
         return "EURUSD"
     if 14 <= hour < 23:  # OTC
         return "EURUSD-OTC"
@@ -162,8 +162,8 @@ def get_current_asset(now):
 
 def main():
     print("===== BOT DE SINAIS IQ -> TELEGRAM =====")
-    print("EURUSD (09h–11h, seg–sex): S/R + Price Action + SMA20")
-    print("EURUSD-OTC (20h–23h, todos os dias): 3 velas fortes consecutivas")
+    print("EURUSD (09h–18h, seg–sex): S/R + Price Action + SMA20")
+    print("EURUSD-OTC (14h–23h, todos os dias): 3 velas fortes consecutivas")
     print("===================================================")
 
     connector = IQConnector(IQ_EMAIL, IQ_PASSWORD)
