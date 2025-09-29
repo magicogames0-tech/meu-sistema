@@ -5,10 +5,10 @@ import traceback
 import requests
 
 # ========= CONFIG =========
-IQ_EMAIL = os.getenv("magicogames0@gmail.com")
-IQ_PASSWORD = os.getenv("david64920169")
-TOKEN = os.getenv("7830300218:AAHv5jzXNu0DTwlbS_4esVLWJYM7LAx2Jic")
-CHAT_ID = int(os.getenv("-1002068593318"))
+IQ_EMAIL = os.getenv("IQ_EMAIL")
+IQ_PASSWORD = os.getenv("IQ_PASSWORD")
+TOKEN = os.getenv("TOKEN")
+CHAT_ID = int(os.getenv("CHAT_ID", "0"))  # Default 0 se não existir
 
 CANDLE_INTERVAL = 5    # minutos
 LOOKBACK_CANDLES = 3   # quantas velas seguidas para confirmar tendência
