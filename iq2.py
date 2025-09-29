@@ -3,6 +3,7 @@ import time
 import datetime
 import traceback
 import requests
+import pytz  # <<< adicionado
 
 # ========= CONFIG =========
 IQ_EMAIL = os.getenv("IQ_EMAIL")
@@ -113,7 +114,7 @@ def normalize_candles(candles):
 
 
 def get_current_asset(now):
-    """Define qual ativo usar baseado no horário"""
+    """Define qual ativo usar baseado no horário de Brasília"""
     weekday = now.weekday()  # 0 = segunda, 6 = domingo
     hour = now.hour
 
@@ -151,9 +152,11 @@ def main():
     pending_signal = None
     pending_time = None
 
+    tz_brt = pytz.timezone("America/Sao_Paulo")  # <<< Timezone fixo BRT
+
     while True:
         try:
-            now = datetime.datetime.now()
+            now = datetime.datetime.now(tz_brt)  # <<< Agora sempre em horário de Brasília
             timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
             asset = get_current_asset(now)
 
@@ -167,7 +170,7 @@ def main():
             signal, reason = analyze_candles_for_signal(normalized, LOOKBACK_CANDLES)
 
             if signal and last_signal_time != normalized[-1]['from']:
-                candle_start = datetime.datetime.fromtimestamp(normalized[-1]['from'])
+                candle_start = datetime.datetime.fromtimestamp(normalized[-1]['from'], tz=tz_brt)
                 next_entry = candle_start + datetime.timedelta(minutes=CANDLE_INTERVAL)
                 send_time = next_entry - datetime.timedelta(minutes=1)
 
