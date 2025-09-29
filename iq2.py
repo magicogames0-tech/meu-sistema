@@ -141,6 +141,16 @@ def main():
         ok = connector.connect()
         if ok:
             print("[OK] Conectado à IQ Option")
+
+            # ===== Mensagem de Boas-vindas =====
+            try:
+                txt = "👋 Olá pessoal! O bot de sinais está online e funcionando. ⏱️"
+                res = telegram_send(TOKEN, CHAT_ID, txt)
+                print(f"[INFO] Mensagem de boas-vindas enviada. Telegram: {res.get('ok')}")
+            except Exception as e:
+                print(f"[ERRO] Falha ao enviar mensagem de boas-vindas: {e}")
+            # ===================================
+
         else:
             print("[ERRO] Falha ao conectar na IQ Option")
             return
