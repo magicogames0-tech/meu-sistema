@@ -3,16 +3,17 @@ import time
 import datetime
 import traceback
 import requests
-import pytz  # <<< adicionado
+import pytz
+import statistics
 
 # ========= CONFIG =========
 IQ_EMAIL = os.getenv("IQ_EMAIL")
 IQ_PASSWORD = os.getenv("IQ_PASSWORD")
 TOKEN = os.getenv("TOKEN")
-CHAT_ID = int(os.getenv("CHAT_ID", "0"))  # Default 0 se não existir
+CHAT_ID = int(os.getenv("CHAT_ID", "0"))
 
 CANDLE_INTERVAL = 5    # minutos
-LOOKBACK_CANDLES = 3   # quantas velas seguidas para confirmar tendência
+LOOKBACK_CANDLES = 30  # usado para suporte/resistência e média móvel
 CHECK_INTERVAL = 20    # segundos entre verificações
 # ==========================
 
@@ -59,36 +60,70 @@ def telegram_send(token, chat_id, text):
         return {"ok": False, "error": str(e)}
 
 
-def analyze_candles_for_signal(candles, lookback=3):
+# =============== ANALISE EURUSD (mercado real) =================
+def detect_support_resistance(candles, n=20):
+    highs = [c['high'] for c in candles[-n:]]
+    lows = [c['low'] for c in candles[-n:]]
+    return max(highs), min(lows)  # resistência, suporte
+
+
+def moving_average(candles, period=20):
+    closes = [c['close'] for c in candles[-period:]]
+    return statistics.mean(closes)
+
+
+def detect_price_action(c1, c2):
+    """Retorna padrão de price action entre 2 últimas velas"""
+    # Engolfo de alta
+    if c2['close'] > c2['open'] and c1['close'] < c1['open'] and c2['close'] > c1['open'] and c2['open'] < c1['close']:
+        return "CALL", "Engolfo de Alta"
+
+    # Engolfo de baixa
+    if c2['close'] < c2['open'] and c1['close'] > c1['open'] and c2['close'] < c1['open'] and c2['open'] > c1['close']:
+        return "PUT", "Engolfo de Baixa"
+
+    # Martelo / Pinbar de alta
+    corpo = abs(c2['close'] - c2['open'])
+    pavio_inferior = min(c2['open'], c2['close']) - c2['low']
+    pavio_superior = c2['high'] - max(c2['open'], c2['close'])
+    if pavio_inferior > 2 * corpo and pavio_superior < corpo:
+        return "CALL", "Martelo (Pinbar de Alta)"
+    if pavio_superior > 2 * corpo and pavio_inferior < corpo:
+        return "PUT", "Estrela Cadente (Pinbar de Baixa)"
+
+    return None, None
+
+
+def analyze_eurusd_real(candles):
+    if len(candles) < LOOKBACK_CANDLES:
+        return None, "candles insuficientes"
+
+    resistencia, suporte = detect_support_resistance(candles, 20)
+    sma20 = moving_average(candles, 20)
+
+    c1, c2 = candles[-2], candles[-1]
+    signal, pa_reason = detect_price_action(c1, c2)
+
+    if not signal:
+        return None, "sem padrão de Price Action"
+
+    # Confirmar se está perto de suporte/resistência
+    if signal == "CALL" and abs(c2['low'] - suporte) <= (c2['high'] - c2['low']) * 0.5 and c2['close'] > sma20:
+        return "CALL", f"{pa_reason} no suporte + acima da SMA20"
+    if signal == "PUT" and abs(c2['high'] - resistencia) <= (c2['high'] - c2['low']) * 0.5 and c2['close'] < sma20:
+        return "PUT", f"{pa_reason} na resistência + abaixo da SMA20"
+
+    return None, "sem confluência suficiente"
+
+
+# =============== ANALISE EURUSD-OTC (mantida) =================
+def analyze_otc(candles, lookback=3):
     if not candles or len(candles) < lookback:
         return None, "candles insuficientes"
 
     last = candles[-lookback:]
-    bullish = True
-    bearish = True
-
-    for c in last:
-        corpo = abs(c['close'] - c['open'])
-        high = c.get('high', max(c['close'], c['open']))
-        low = c.get('low', min(c['close'], c['open']))
-
-        maximo = max(c['close'], c['open'])
-        minimo = min(c['close'], c['open'])
-
-        pavio_superior = high - maximo
-        pavio_inferior = minimo - low
-        range_total = high - low if high > low else corpo
-
-        if range_total == 0 or corpo < 0.3 * range_total:
-            return None, "candle fraco"
-
-        if pavio_superior > corpo or pavio_inferior > corpo:
-            return None, "pavio longo demais"
-
-        if not (c['close'] > c['open']):
-            bullish = False
-        if not (c['close'] < c['open']):
-            bearish = False
+    bullish = all(c['close'] > c['open'] for c in last)
+    bearish = all(c['close'] < c['open'] for c in last)
 
     if bullish:
         return "CALL", f"{lookback} velas fortes consecutivas de alta"
@@ -97,6 +132,7 @@ def analyze_candles_for_signal(candles, lookback=3):
     return None, "sem tendência clara"
 
 
+# ===============================================================
 def normalize_candles(candles):
     normalized = []
     for c in candles:
@@ -114,59 +150,39 @@ def normalize_candles(candles):
 
 
 def get_current_asset(now):
-    """Define qual ativo usar baseado no horário de Brasília"""
     weekday = now.weekday()  # 0 = segunda, 6 = domingo
     hour = now.hour
 
-    # Mercado real -> apenas seg a sex, 09h–13h
-    if weekday < 5 and 9 <= hour < 13:
+    if weekday < 5 and 9 <= hour < 11:  # EURUSD mercado real
         return "EURUSD"
-
-    # OTC -> todos os dias, 20h–23h
-    if 20 <= hour < 23:
+    if 20 <= hour < 23:  # OTC
         return "EURUSD-OTC"
-
-    # Fora do horário
     return None
 
 
 def main():
     print("===== BOT DE SINAIS IQ -> TELEGRAM =====")
-    print("Configuração: Intervalo de 5M | Lookback 3 velas fortes")
-    print("Horários: Mercado Real 09h–13h | OTC 20h–23h (BRT)")
-    print("========================================")
+    print("EURUSD (09h–11h, seg–sex): S/R + Price Action + SMA20")
+    print("EURUSD-OTC (20h–23h, todos os dias): 3 velas fortes consecutivas")
+    print("===================================================")
 
     connector = IQConnector(IQ_EMAIL, IQ_PASSWORD)
     if IQ_LIB_AVAILABLE:
         ok = connector.connect()
-        if ok:
-            print("[OK] Conectado à IQ Option")
-
-            # ===== Mensagem de Boas-vindas =====
-            try:
-                txt = "👋 Olá pessoal! O bot de sinais está online e funcionando. ⏱️"
-                res = telegram_send(TOKEN, CHAT_ID, txt)
-                print(f"[INFO] Mensagem de boas-vindas enviada. Telegram: {res.get('ok')}")
-            except Exception as e:
-                print(f"[ERRO] Falha ao enviar mensagem de boas-vindas: {e}")
-            # ===================================
-
-        else:
+        if not ok:
             print("[ERRO] Falha ao conectar na IQ Option")
             return
     else:
-        print("[ERRO] iqoptionapi não encontrado, instale com: pip install git+https://github.com/Lu-Yi-Hsun/iqoptionapi.git")
+        print("[ERRO] iqoptionapi não encontrado")
         return
 
+    tz_brt = pytz.timezone("America/Sao_Paulo")
     last_signal_time = None
-    pending_signal = None
-    pending_time = None
-
-    tz_brt = pytz.timezone("America/Sao_Paulo")  # <<< Timezone fixo BRT
+    pending_signal, pending_time = None, None
 
     while True:
         try:
-            now = datetime.datetime.now(tz_brt)  # <<< Agora sempre em horário de Brasília
+            now = datetime.datetime.now(tz_brt)
             timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
             asset = get_current_asset(now)
 
@@ -177,7 +193,11 @@ def main():
 
             candles = connector.get_candles(asset, CANDLE_INTERVAL, LOOKBACK_CANDLES)
             normalized = normalize_candles(candles)
-            signal, reason = analyze_candles_for_signal(normalized, LOOKBACK_CANDLES)
+
+            if asset == "EURUSD":
+                signal, reason = analyze_eurusd_real(normalized)
+            else:
+                signal, reason = analyze_otc(normalized, 3)
 
             if signal and last_signal_time != normalized[-1]['from']:
                 candle_start = datetime.datetime.fromtimestamp(normalized[-1]['from'], tz=tz_brt)
@@ -193,7 +213,7 @@ def main():
                 pending_time = send_time
                 last_signal_time = normalized[-1]['from']
 
-                print(f"[{timestamp}] ({asset}) Sinal identificado: {signal} | Entrada às {next_entry.strftime('%H:%M:%S')} | Envio agendado às {send_time.strftime('%H:%M:%S')}")
+                print(f"[{timestamp}] ({asset}) Sinal identificado: {signal} | Entrada às {next_entry.strftime('%H:%M:%S')}")
 
             elif pending_signal and now >= pending_time:
                 txt = (
@@ -206,16 +226,14 @@ def main():
                     f"ATÉ GALE 1\n\n"
                     f"💡 Recomendação: Operar sempre dentro dos horários de maior volatilidade."
                 )
-                res = telegram_send(TOKEN, CHAT_ID, txt)
-                print(f"[{timestamp}] ENVIADO -> {pending_signal['type']} | {pending_signal['asset']} | Entrada {pending_signal['next_entry'].strftime('%H:%M:%S')} | Telegram: {res.get('ok')}")
-                pending_signal = None
-                pending_time = None
+                telegram_send(TOKEN, CHAT_ID, txt)
+                print(f"[{timestamp}] ENVIADO -> {pending_signal['type']} | {pending_signal['asset']}")
+                pending_signal, pending_time = None, None
             else:
                 print(f"[{timestamp}] ({asset}) Sem sinal ({reason})")
 
         except Exception as e:
-            tb = traceback.format_exc()
-            print(f"[ERRO LOOP] {e}\n{tb}")
+            print(f"[ERRO LOOP] {e}\n{traceback.format_exc()}")
 
         time.sleep(CHECK_INTERVAL)
 
