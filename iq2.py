@@ -29,16 +29,28 @@ class IQConnector:
         self.api = None
         self.connected = False
         if IQ_LIB_AVAILABLE:
-            self.api = IQ_Option(email, password)
+            try:
+                self.api = IQ_Option(email, password)
+            except Exception as e:
+                print(f"[ERRO] Falha ao inicializar IQ_Option: {e}")
 
     def connect(self):
         if not IQ_LIB_AVAILABLE:
             print("[ERRO] iqoptionapi não está instalado.")
             return False
         print("[INFO] Tentando conectar na IQ Option...")
-        self.connected, reason = self.api.connect()
-        print(f"[DEBUG] Conectado: {self.connected} | Motivo: {reason}")
-        return self.connected
+        try:
+            self.connected, reason = self.api.connect()
+            print(f"[DEBUG] Conectado: {self.connected} | Motivo: {reason}")
+            if not self.connected:
+                print("[ERRO] Falha ao conectar na IQ Option. Verifique:")
+                print("  - Email e senha corretos")
+                print("  - Conta sem 2FA ativo ou usar código de app")
+                print("  - Rede/Firewall permitindo WebSocket")
+            return self.connected
+        except Exception as e:
+            print(f"[ERRO] Exceção durante a conexão: {e}")
+            return False
 
     def get_candles(self, asset, interval_minutes, n):
         if not self.connected:
@@ -64,7 +76,7 @@ def telegram_send(token, chat_id, text):
 def detect_support_resistance(candles, n=20):
     highs = [c['high'] for c in candles[-n:]]
     lows = [c['low'] for c in candles[-n:]]
-    return max(highs), min(lows)  # resistência, suporte
+    return max(highs), min(lows)
 
 
 def moving_average(candles, period=20):
@@ -107,7 +119,6 @@ def analyze_eurusd_real(candles):
     if not signal:
         return None, "sem padrão de Price Action"
 
-    # Confirmar se está perto de suporte/resistência
     if signal == "CALL" and abs(c2['low'] - suporte) <= (c2['high'] - c2['low']) * 0.5 and c2['close'] > sma20:
         return "CALL", f"{pa_reason} no suporte + acima da SMA20"
     if signal == "PUT" and abs(c2['high'] - resistencia) <= (c2['high'] - c2['low']) * 0.5 and c2['close'] < sma20:
@@ -116,7 +127,7 @@ def analyze_eurusd_real(candles):
     return None, "sem confluência suficiente"
 
 
-# =============== ANALISE EURUSD-OTC (mantida) =================
+# =============== ANALISE EURUSD-OTC =================
 def analyze_otc(candles, lookback=3):
     if not candles or len(candles) < lookback:
         return None, "candles insuficientes"
@@ -150,12 +161,12 @@ def normalize_candles(candles):
 
 
 def get_current_asset(now):
-    weekday = now.weekday()  # 0 = segunda, 6 = domingo
+    weekday = now.weekday()
     hour = now.hour
 
-    if weekday < 5 and 9 <= hour < 18:  # EURUSD mercado real
+    if weekday < 5 and 9 <= hour < 18:
         return "EURUSD"
-    if 14 <= hour < 23:  # OTC
+    if 14 <= hour < 23:
         return "EURUSD-OTC"
     return None
 
@@ -166,15 +177,17 @@ def main():
     print("EURUSD-OTC (14h–23h, todos os dias): 3 velas fortes consecutivas")
     print("===================================================")
 
+    # Fallback para teste local
+    global IQ_EMAIL, IQ_PASSWORD
+    if not IQ_EMAIL or not IQ_PASSWORD:
+        print("[WARN] Variáveis de ambiente não definidas. Usando credenciais fixas.")
+        IQ_EMAIL = "seu_email@exemplo.com"
+        IQ_PASSWORD = "sua_senha"
+
     connector = IQConnector(IQ_EMAIL, IQ_PASSWORD)
-    if IQ_LIB_AVAILABLE:
-        ok = connector.connect()
-        if not ok:
-            print("[ERRO] Falha ao conectar na IQ Option")
-            return
-    else:
-        print("[ERRO] iqoptionapi não encontrado")
-        return
+    while not connector.connect():
+        print("[INFO] Tentando reconectar em 15s...")
+        time.sleep(15)
 
     tz_brt = pytz.timezone("America/Sao_Paulo")
     last_signal_time = None
